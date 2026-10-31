@@ -89,22 +89,10 @@ button:focus,button:focus-visible{outline:none}
 .day-chip.active{border-color:var(--muted);box-shadow:0 0 0 1px var(--muted) inset}
 .day-chip.active .dc-top{color:var(--red)}
 .back-link{background:none;border:none;color:var(--muted);font-size:15px;font-weight:500;padding:0 0 10px;display:block}
-.cal{padding:0 18px}
-.cal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
-.cal-title{font-size:22px;font-weight:700}
-.cal-nav{display:flex;gap:8px}
-.cal-nav button{background:var(--surface);border:1px solid var(--border);border-radius:10px;height:40px;min-width:40px;padding:0 12px;font-size:16px;font-weight:500;color:var(--text)}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
-.cal-dow{text-align:center;font-size:12px;color:var(--muted);letter-spacing:.6px;padding:4px 0 6px}
-.cal-cell{aspect-ratio:1;border-radius:12px;background:transparent;border:1px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:17px;font-weight:600;color:var(--muted);opacity:.55}
-.cal-cell.has{background:var(--surface);border:1px solid color-mix(in srgb,var(--red) 45%,transparent);color:var(--text);opacity:1}
-.cal-cell.has:active{background:var(--red-soft)}
-.cal-cell.today{box-shadow:0 0 0 2px var(--red) inset;opacity:1}
-.cal-cell.today:not(.has){color:var(--red)}
-.cal-cell .dot{width:6px;height:6px}
-.cal-cell .nodot{width:6px;height:6px}
-.cal-legend{display:flex;gap:16px;margin-top:16px;font-size:13px;color:var(--muted);align-items:center}
-.cal-legend span{display:flex;align-items:center;gap:6px}
+.pick-card{width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px 20px;color:var(--text)}
+.pick-card:active{border-color:var(--red);background:var(--red-soft)}
+.pk-name{display:block;font-size:20px;font-weight:600;margin-bottom:10px}
+.pick-card .chips{margin-bottom:0}
 .day-label{padding:18px 18px 10px;font-size:15px;color:var(--muted)}
 #blocks-container{padding:0 18px;display:flex;flex-direction:column;gap:16px}
 .section-title{display:flex;align-items:center;justify-content:space-between;padding:22px 18px 14px}
@@ -194,7 +182,8 @@ button:focus,button:focus-visible{outline:none}
       <button class="btn-secondary" onclick="mostrarMenuModo(true)">Rutina diaria</button>
     </div>
     <div id="menuModo" class="home-buttons" style="display:none;">
-      <button class="btn-secondary" onclick="entrarSemanaCompleta()">Semana completa</button>
+      <button class="btn-secondary" onclick="entrarRutinaDiaria(['rutina 3 dias','3 dias'],'Rutina 3 días')">Rutina 3 días</button>
+      <button class="btn-secondary" onclick="entrarRutinaDiaria(['rutina 2 dias','2 dias'],'Rutina 2 días')">Rutina 2 días</button>
       <button class="btn-secondary" onclick="mostrarMenuDiaria(true)">Día suelto</button>
       <button class="btn-back" onclick="mostrarMenuModo(false)">← Volver</button>
     </div>
@@ -221,7 +210,7 @@ button:focus,button:focus-visible{outline:none}
 
 <!-- APP -->
 <div id="app-content">
-  <div class="page-head" id="pageHead"><button class="back-link" id="backBtn" onclick="volverSemana()" hidden>← Calendario</button><h2 id="pageTitle">Plan semanal</h2><p id="pageSub"></p></div>
+  <div class="page-head" id="pageHead"><button class="back-link" id="backBtn" onclick="volverSemana()" hidden>← Rutinas</button><h2 id="pageTitle">Plan semanal</h2><p id="pageSub"></p></div>
   <div class="days" id="tabs-container"></div>
   <div class="day-label" id="dayLabel"></div>
   <div id="blocks-container"></div>
@@ -251,10 +240,7 @@ let showProgress = false;
 let progressUrl = "";
 let modoGeneral = false;
 let alumnoActual = "";
-let modoSemana = false, diaAbierto = false;
-let calY = 0, calM = 0, selDate = null;
-const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-const DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+let modoElegir = false, diaAbierto = false;
 
 // Estado en memoria (para no perder lo cargado al cambiar de día)
 let checks = {}, cargaMem = {}, openBlocks = {}, rpeOpen = {};
@@ -369,26 +355,16 @@ async function mostrarRutina(userRows, alumnoNombre){
   render();
 }
 
-async function entrarRutinaDiaria(tipo){
+async function entrarRutinaDiaria(tipo, titulo){
+  const claves = [].concat(tipo).map(normalizarNombre);
   try {
     const response = await fetch(WEB_APP_URL);
     allData = await response.json();
-    const filas = allData.filter(r => String(r.usuario).trim().toLowerCase() === tipo);
-    if (filas.length === 0){ alert("Todavía no hay rutina cargada para " + tipo + "."); return; }
-    modoGeneral = true; modoSemana = false; currentUser = ""; rpeByDay = {}; showProgress = false;
-    mostrarRutina(filas, tipo.replace(/\b\w/g, c => c.toUpperCase()));
-  } catch(e){ alert("Error de conexión con Google Sheets."); }
-}
-
-async function entrarSemanaCompleta(){
-  try {
-    const response = await fetch(WEB_APP_URL);
-    allData = await response.json();
-    const filas = allData.filter(r => { const u = String(r.usuario).trim().toLowerCase(); return u === 'semana completa' || u === 'semana'; });
-    if (filas.length === 0){ alert("Todavía no hay una semana completa cargada."); return; }
-    modoGeneral = true; modoSemana = true; currentUser = ""; rpeByDay = {}; showProgress = false;
-    const hoy = new Date(); calY = hoy.getFullYear(); calM = hoy.getMonth(); selDate = null;
-    mostrarRutina(filas, "Semana completa");
+    const filas = allData.filter(r => claves.includes(normalizarNombre(r.usuario)));
+    if (filas.length === 0){ alert("Todavía no hay rutina cargada para " + (titulo || claves[0]) + "."); return; }
+    modoGeneral = true; currentUser = ""; rpeByDay = {}; showProgress = false;
+    modoElegir = new Set(filas.map(r => r.dia || "Día 1")).size > 1;
+    mostrarRutina(filas, titulo || claves[0].replace(/\b\w/g, c => c.toUpperCase()));
   } catch(e){ alert("Error de conexión con Google Sheets."); }
 }
 
@@ -403,7 +379,7 @@ async function login(){
     allData = await response.json();
     const userRows = allData.filter(row => String(row.usuario).trim().toLowerCase() === currentUser && String(row.codigo).trim() === passVal);
     if (userRows.length === 0){ errorDiv.innerText = "Usuario o código incorrectos."; errorDiv.style.display = "block"; return; }
-    modoGeneral = false; modoSemana = false;
+    modoGeneral = false; modoElegir = false;
     mostrarRutina(userRows, userRows[0].alumno || currentUser);
   } catch(error){ errorDiv.innerText = "Error de conexión con Google Sheets."; errorDiv.style.display = "block"; }
 }
@@ -415,7 +391,7 @@ function logout(){
   ocultarLogin();
   $('userInput').value = ''; $('passInput').value = '';
   routineDays = {}; rpeByDay = {}; showProgress = false; progressUrl = "";
-  activeDay = ""; currentUser = ""; modoGeneral = false; modoSemana = false; diaAbierto = false;
+  activeDay = ""; currentUser = ""; modoGeneral = false; modoElegir = false; diaAbierto = false;
   checks = {}; cargaMem = {}; openBlocks = {}; rpeOpen = {};
 }
 
@@ -448,7 +424,7 @@ async function guardarTodoElHistorial(){
 }
 
 /* ===== Navegación ===== */
-function goSession(){ showProgress = false; if (modoSemana) diaAbierto = false; render(); window.scrollTo(0,0); }
+function goSession(){ showProgress = false; if (modoElegir) diaAbierto = false; render(); window.scrollTo(0,0); }
 function volverSemana(){ diaAbierto = false; render(); window.scrollTo(0,0); }
 function goProgress(){ showProgress = true; render(); window.scrollTo(0,0); }
 
@@ -492,18 +468,18 @@ function render(){
     return;
   }
   $('pageHead').hidden = false; $('dayLabel').hidden = false; $('backBtn').hidden = true;
-  if (modoSemana && !diaAbierto){
+  if (modoElegir && !diaAbierto){
     $('tabs-container').hidden = true; $('dayLabel').hidden = true;
     $('saveBar').style.display = 'none';
-    $('pageTitle').innerText = 'Calendario';
-    $('pageSub').innerText = 'Tocá un día para ver la rutina';
-    container.appendChild(renderCalendario());
+    $('pageTitle').innerText = alumnoActual;
+    $('pageSub').innerText = 'Elegí una rutina';
+    container.appendChild(renderListaRutinas());
     return;
   }
-  $('tabs-container').hidden = modoSemana;
-  if (modoSemana){
+  $('tabs-container').hidden = modoElegir;
+  if (modoElegir){
     $('backBtn').hidden = false; $('dayLabel').hidden = true;
-    $('pageTitle').innerText = activeDay; $('pageSub').innerText = selDate ? (DIAS[selDate.getDay()].charAt(0).toUpperCase() + DIAS[selDate.getDay()].slice(1) + ' ' + selDate.getDate() + ' de ' + MESES[selDate.getMonth()]) : 'Semana completa';
+    $('pageTitle').innerText = activeDay; $('pageSub').innerText = alumnoActual;
   } else {
     $('pageTitle').innerText = modoGeneral ? alumnoActual : 'Mi plan';
     $('pageSub').innerText = daysList.length + (daysList.length === 1 ? ' día' : ' días') + (modoGeneral ? ' · rutina diaria' : ' · ' + alumnoActual);
@@ -517,54 +493,17 @@ function render(){
   if (!modoGeneral) container.appendChild(renderRpeBox(activeDay));
 }
 
-function buildWeekMap(){
-  const names = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
-  const map = {};
-  Object.keys(routineDays).forEach((day, i) => {
-    const n = normalizarNombre(day);
-    let idx = names.findIndex(w => n.startsWith(w.slice(0,3)));
-    if (idx < 0){ const m = n.match(/(\d+)/); idx = m ? Math.max(parseInt(m[1],10) - 1, 0) % 7 : i % 7; }
-    if (map[idx] === undefined) map[idx] = day;
-  });
-  return map;
-}
-
-function renderCalendario(){
-  const map = buildWeekMap();
-  const hoy = new Date();
-  const wrap = document.createElement('div'); wrap.className = 'cal';
-  const first = new Date(calY, calM, 1);
-  const offset = (first.getDay() + 6) % 7;
-  const total = new Date(calY, calM + 1, 0).getDate();
-
-  let cells = ['L','M','X','J','V','S','D'].map(d => `<div class="cal-dow">${d}</div>`).join('');
-  for (let i = 0; i < offset; i++) cells += '<div></div>';
-  for (let d = 1; d <= total; d++){
-    const date = new Date(calY, calM, d);
-    const wd = (date.getDay() + 6) % 7;
-    const day = map[wd];
-    const isToday = date.toDateString() === hoy.toDateString();
-    const done = day && dayStatus(day).all;
-    cells += `<button class="cal-cell ${day ? 'has' : ''} ${isToday ? 'today' : ''}" data-d="${d}" ${day ? '' : 'disabled'}>${d}${day ? `<i class="dot ${done ? 'g' : 'o'}"></i>` : '<i class="nodot"></i>'}</button>`;
-  }
-  wrap.innerHTML = `
-    <div class="cal-head">
-      <div class="cal-title">${MESES[calM].charAt(0).toUpperCase() + MESES[calM].slice(1)} ${calY}</div>
-      <div class="cal-nav"><button id="calPrev" aria-label="Mes anterior">‹</button><button id="calNext" aria-label="Mes siguiente">›</button><button id="calHoy">hoy</button></div>
-    </div>
-    <div class="cal-grid">${cells}</div>
-    <div class="cal-legend"><span><i class="dot o"></i>con rutina</span><span><i class="dot g"></i>completada</span></div>`;
-
-  const refresh = () => { $('blocks-container').innerHTML = ''; $('blocks-container').appendChild(renderCalendario()); };
-  wrap.querySelector('#calPrev').onclick = () => { calM--; if (calM < 0){ calM = 11; calY--; } refresh(); };
-  wrap.querySelector('#calNext').onclick = () => { calM++; if (calM > 11){ calM = 0; calY++; } refresh(); };
-  wrap.querySelector('#calHoy').onclick = () => { calY = hoy.getFullYear(); calM = hoy.getMonth(); refresh(); };
-  wrap.querySelectorAll('.cal-cell.has').forEach(c => {
-    c.onclick = () => {
-      const date = new Date(calY, calM, parseInt(c.dataset.d, 10));
-      selDate = date; activeDay = map[(date.getDay() + 6) % 7]; diaAbierto = true;
-      render(); window.scrollTo(0,0);
-    };
+function renderListaRutinas(){
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'padding:0 18px;display:flex;flex-direction:column;gap:12px';
+  Object.keys(routineDays).forEach(day => {
+    let n = 0; const bl = Object.keys(routineDays[day]);
+    bl.forEach(b => { n += routineDays[day][b].exercises.length; });
+    const st = dayStatus(day);
+    const btn = document.createElement('button'); btn.className = 'pick-card';
+    btn.innerHTML = `<span class="pk-name">${esc(day)}</span><span class="chips"><span class="chip">${n} ${n === 1 ? 'ejercicio' : 'ejercicios'}</span><span class="chip">${bl.length} ${bl.length === 1 ? 'bloque' : 'bloques'}</span>${st.all ? '<span class="chip ok">completada</span>' : ''}</span>`;
+    btn.onclick = () => { activeDay = day; diaAbierto = true; render(); window.scrollTo(0,0); };
+    wrap.appendChild(btn);
   });
   return wrap;
 }
